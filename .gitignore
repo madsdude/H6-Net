@@ -1,0 +1,27 @@
+# Secrets / sensitive files
+*.key
+*.pem
+*.p12
+*.env
+secrets/
+private/
+
+# Backups
+*.bak
+*.old
+*.backup
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+
+# Raw exports that may contain secrets
+configs/raw/
+
+# Temporary files
+*.tmp
+*.log
