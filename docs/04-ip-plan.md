@@ -1,79 +1,63 @@
-# 04 - IP Plan
+# 04 - IP-plan
 
-Dette dokument samler IP-planen for H6-Net.
+Dette dokument samler IP-planen for H6-Net baseret på `configs/Today-configs`.
 
-> Status: Korrigeret efter to-CE design. Endelig verifikation skal altid ske mod aktuelle running-configs.
+## Router loopbacks
 
-## CE Loopbacks
-
-| Device | Loopback | Formål |
+| Enhed | Loopback0 | Funktion |
 | --- | --- | --- |
-| CE-CORE-R1 | 11.11.11.11/32 | CORE router-id og test source |
-| CE-AAH-R1 | 22.22.22.22/32 | AAH CE1 router-id og test source |
-| CE-KBH-R1 | 33.33.33.33/32 | KBH CE1 router-id og test source |
-| CE-ODE-R1 | 44.44.44.44/32 | ODE CE1 router-id og test source |
-| CE-AAH-R2 | TBD | AAH CE2 router-id og test source |
-| CE-KBH-R2 | TBD | KBH CE2 router-id og test source |
-| CE-ODE-R2 | TBD | ODE CE2 router-id og test source |
+| CE-CORE-R1 | 11.11.11.11/32 | CORE router-id og BGP router-id |
+| CE-AAH-R1 | 22.22.22.22/32 | AAH CE1 router-id og annonceret BGP network |
+| CE-AAH-R2 | 22.22.22.23/32 | AAH CE2 router-id og annonceret BGP network |
+| CE-KBH-R1 | 33.33.33.33/32 | KBH CE1 router-id og annonceret BGP network |
+| CE-KBH-R2 | 33.33.33.34/32 | KBH CE2 router-id og annonceret BGP network |
+| CE-ODE-R1 | 44.44.44.44/32 | ODE CE1 router-id og annonceret BGP network |
+| CE-ODE-R2 | 44.44.44.45/32 | ODE CE2 router-id og annonceret BGP network |
+| ISP-R1 | 1.1.1.1/32 | PE-side router-id |
+| P1 | 2.2.2.2/32 | Provider core router-id |
+| P2 | 3.3.3.3/32 | Provider core router-id |
+| Remote PE | 4.4.4.4/32 | Xconnect peer set i ISP-R1 config; config mangler i Today-configs |
 
-## CE to CORE WAN /30 Networks
+## Provider core IP-plan
 
-Hvert site har sin egen site-blok. CE1 bruger første /30, og CE2 bruger næste /30 i samme site-blok.
-
-### AAH - AS 65010
-
-| Link | Network | CORE IP | Site IP |
+| Link | Enhed/interface | IP | Net |
 | --- | --- | --- | --- |
-| CE-CORE-R1 to CE-AAH-R1 | 10.10.0.0/30 | 10.10.0.1 | 10.10.0.2 |
-| CE-CORE-R1 to CE-AAH-R2 | 10.10.0.4/30 | 10.10.0.5 | 10.10.0.6 |
+| ISP-R1 - P1 | ISP-R1 Gi0/0 | 10.0.12.1/30 | 10.0.12.0/30 |
+| ISP-R1 - P1 | P1 Gi0/0 | 10.0.12.2/30 | 10.0.12.0/30 |
+| ISP-R1 - P2 | ISP-R1 Gi0/2 | 10.0.13.1/30 | 10.0.13.0/30 |
+| ISP-R1 - P2 | P2 Gi0/0 | 10.0.13.2/30 | 10.0.13.0/30 |
+| P1 - Remote PE | P1 Gi0/1 | 10.0.24.1/30 | 10.0.24.0/30 |
+| P2 - Remote PE | P2 Gi0/1 | 10.0.34.1/30 | 10.0.34.0/30 |
 
-### KBH - AS 65020
+## CE-CORE til site CE IP-plan
 
-| Link | Network | CORE IP | Site IP |
-| --- | --- | --- | --- |
-| CE-CORE-R1 to CE-KBH-R1 | 10.20.0.0/30 | 10.20.0.1 | 10.20.0.2 |
-| CE-CORE-R1 to CE-KBH-R2 | 10.20.0.4/30 | 10.20.0.5 | 10.20.0.6 |
+| Site | Link | VLAN | CORE IP | Site CE IP | Net |
+| --- | --- | --- | --- | --- | --- |
+| AAH | CORE - CE1 primary | 101 | 10.10.0.1/30 | 10.10.0.2/30 | 10.10.0.0/30 |
+| AAH | CORE - CE2 secondary | 102 | 10.10.0.5/30 | 10.10.0.6/30 | 10.10.0.4/30 |
+| KBH | CORE - CE1 primary | 201 | 10.20.0.1/30 | 10.20.0.2/30 | 10.20.0.0/30 |
+| KBH | CORE - CE2 secondary | 202 | 10.20.0.5/30 | 10.20.0.6/30 | 10.20.0.4/30 |
+| ODE | CORE - CE1 primary | 301 | 10.30.0.1/30 | 10.30.0.2/30 | 10.30.0.0/30 |
+| ODE | CORE - CE2 secondary | 302 | 10.30.0.5/30 | 10.30.0.6/30 | 10.30.0.4/30 |
 
-### ODE - AS 65030
+## CE1 til CE2 interconnect
 
-| Link | Network | CORE IP | Site IP |
-| --- | --- | --- | --- |
-| CE-CORE-R1 to CE-ODE-R1 | 10.30.0.0/30 | 10.30.0.1 | 10.30.0.2 |
-| CE-CORE-R1 to CE-ODE-R2 | 10.30.0.4/30 | 10.30.0.5 | 10.30.0.6 |
-
-## /30 Calculation Example
-
-A /30 subnet increments by 4 addresses.
-
-| Subnet | Network | Host 1 | Host 2 | Broadcast |
+| Site | CE1 IP | CE2 IP | Net | Formål |
 | --- | --- | --- | --- | --- |
-| 10.10.0.0/30 | 10.10.0.0 | 10.10.0.1 | 10.10.0.2 | 10.10.0.3 |
-| 10.10.0.4/30 | 10.10.0.4 | 10.10.0.5 | 10.10.0.6 | 10.10.0.7 |
+| AAH | 10.10.0.9/30 | 10.10.0.10/30 | 10.10.0.8/30 | iBGP og lokal CE-redundans |
+| KBH | 10.20.0.9/30 | 10.20.0.10/30 | 10.20.0.8/30 | iBGP og lokal CE-redundans |
+| ODE | 10.30.0.9/30 | 10.30.0.10/30 | 10.30.0.8/30 | iBGP og lokal CE-redundans |
 
-## BGP Neighbor Pattern on CORE
+## Gamle/midlertidige sekundære WAN-links
 
-CORE should peer with the site-side IPs.
+Disse findes på CE1-routerne, men bruges ikke som primær del af den nye to-CE BGP-plan i de aktuelle configs.
 
-| Site | CE1 neighbor | CE2 neighbor |
-| --- | --- | --- |
-| AAH | 10.10.0.2 | 10.10.0.6 |
-| KBH | 10.20.0.2 | 10.20.0.6 |
-| ODE | 10.30.0.2 | 10.30.0.6 |
+| Site | Interface | IP | Net | Status |
+| --- | --- | --- | --- | --- |
+| AAH | CE-AAH-R1 Gi0/1 | 10.11.0.2/30 | 10.11.0.0/30 | Legacy/migration |
+| KBH | CE-KBH-R1 Gi0/1 | 10.21.0.2/30 | 10.21.0.0/30 | Legacy/migration |
+| ODE | CE-ODE-R1 Gi0/1 | 10.31.0.2/30 | 10.31.0.0/30 | Legacy/migration |
 
-## Important Notes
+## Upstream/NAT outside
 
-- 10.11.0.0/30, 10.21.0.0/30 and 10.31.0.0/30 must not be documented as CE2 links in the current two-CE design unless configs prove they are still used as legacy links.
-- CE2 loopbacks must be added to the CORE NAT ACL if CE2 loopbacks need internet breakout.
-- OSPF network statements must match the actual active WAN subnets during migration.
-- Running-configs are the source of truth before committing final implementation notes.
-
-## P/PE and MPLS Core IPs
-
-The following still needs to be documented from configs:
-
-- P-router loopbacks
-- PE-router loopbacks
-- P-to-PE transit links
-- PE-to-PE / MPLS transport links
-- OSPF process and areas in provider core
-- LDP router-ids and active MPLS interfaces
+CE-CORE-R1 bruger `GigabitEthernet0/1` som NAT outside og får IP via DHCP. Default route peger mod `10.50.170.1`.
