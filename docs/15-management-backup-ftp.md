@@ -1,10 +1,23 @@
-# 15 - Management og FTP/TFTP backup
+# 15 - ISP management og config backup
 
-Dette dokument beskriver, hvordan P-routere og SW-CE-switches kan få management-reachability til en backupserver, så running-configs kan kopieres ud.
+Dette dokument beskriver, hvordan P-, PE- og SW-CE-enheder kan få management-reachability til en backupserver uden at bruge samme internet breakout som kundens CE-routere.
+
+## Designbeslutning
+
+ISP-udstyr og kunde-/site-CE skal holdes adskilt.
+
+Følgende udstyr skal ikke bruge CE-CORE-R1 som internet-/backup-gateway:
+
+- P-routere
+- PE-routere
+- SW-CE-switches
+- ISP management-adgang
+
+CE-CORE-R1 må gerne være internet breakout for kundens sites, men den bør ikke være management breakout for ISP-udstyret.
 
 ## Formål
 
-Målet er at kunne sende configs fra provider- og switchlaget til en central FTP/TFTP-server uden at blande management-trafik unødigt ind i kundens CE/BGP-routing.
+Målet er at kunne sende configs fra provider- og switchlaget til en central backupserver, uden at management-trafik går igennem kundens CE/BGP/NAT-design.
 
 Eksisterende CE-routere bruger allerede denne arkiv-template:
 
@@ -15,16 +28,42 @@ archive
  time-period 1440
 ```
 
-Hvis backupserveren er en FTP-server i stedet for TFTP, skal `path` ændres til FTP-format med username/password.
+Det kan fortsat bruges på CE-routere, men ISP-udstyr bør have en separat management path.
 
-## Vigtig designregel
+## Korrekt overordnet design
 
-Management og transport bør holdes adskilt:
+```text
+                         Backupserver
+                              |
+                      ISP-MGMT router/firewall
+                              |
+                       ISP management switch
+              /               |               \
+           P-routere        PE-routere        SW-CE
 
+
+                         Kundeside / sites
+                              |
+                          CE-CORE-R1
+                              |
+                       Site CE1 / CE2
+```
+
+Der er to adskilte domæner:
+
+| Domæne | Bruges til | Gateway |
+| --- | --- | --- |
+| ISP-MGMT | Backup, SSH, drift og config-arkiv for P/PE/SW-CE | ISP-MGMT router/firewall |
+| CUSTOMER/CE | Kundens site-routing og internet breakout | CE-CORE-R1 |
+
+## Vigtige designregler
+
+- P/PE/SW-CE skal ikke bruge CE-CORE-R1 som default gateway.
 - P-routere skal ikke lære kundens CE/BGP-ruter.
-- SW-CE skal ikke bruges som transit for kundetrafik.
-- Backup-adgang bør ske via management-IP, management-VLAN eller en dedikeret management-router.
-- NAT til backupserver/internet bør ske centralt, ikke på alle enheder.
+- SW-CE skal ikke være transit for management via kundens CE-routing.
+- ISP management skal have separat VLAN/subnet eller fysisk out-of-band interface.
+- Backupserveren skal nås via ISP-MGMT, ikke via kundens NAT på CE-CORE-R1.
+- Hvis backupserveren ligger på samme fysiske host-net som labbet, bør ISP-MGMT-routeren/firewallen have en kontrolleret route til den.
 
 ## Status i aktuelle configs
 
@@ -37,164 +76,170 @@ SW-CE1 og SW-CE2 har allerede management SVI'er:
 
 Men VLAN 10 er ikke med i de trunk allowed-lister, der er fundet i configs. Det betyder, at switchenes default-gateway ikke kan nås, før management-VLAN'et bliver transporteret eller gatewayen placeres lokalt.
 
-## Anbefalet løsning A - Management via CE-CORE-R1
+Da ISP og kunde skal holdes adskilt, bør disse SVI'er ikke gatewayes via CE-CORE-R1. De bør i stedet flyttes til et ISP-MGMT VLAN/subnet.
 
-Dette er den simple løsning i labbet.
+## Anbefalet løsning - separat ISP-MGMT net
 
-### Idé
+Brug et separat management-net kun til providerudstyr.
 
-- Brug en eller flere management VLANs.
-- Lad CE-CORE-R1 være default gateway for management-subnets.
-- Tillad management VLANs på relevante trunks.
-- Tilføj management-subnets til NAT ACL, hvis backupserveren ligger uden for labbet.
+Eksempel:
 
-### Eksempel: SW-CE1
+| Enhed | Management IP | Gateway |
+| --- | --- | --- |
+| ISP-MGMT-GW | 172.16.99.1/24 | Mod backupserver/host-net |
+| ISP-R1 / PE | 172.16.99.10/24 | 172.16.99.1 |
+| P1 | 172.16.99.21/24 | 172.16.99.1 |
+| P2 | 172.16.99.22/24 | 172.16.99.1 |
+| SW-CE1 | 172.16.99.31/24 | 172.16.99.1 |
+| SW-CE2 | 172.16.99.32/24 | 172.16.99.1 |
+| Backupserver | 10.50.170.19 eller 172.16.99.100 | Via ISP-MGMT |
 
-Hvis SW-CE1 skal bruge `10.10.10.0/24`:
+## P/PE-router config-model
 
-På CE-CORE-R1:
+Hvis der findes et ledigt interface, bruges det som management-interface.
 
-```text
-interface GigabitEthernet0/0.10
- description MGMT-SW-CE1
- encapsulation dot1Q 10
- ip address 10.10.10.1 255.255.255.0
- ip nat inside
- ip virtual-reassembly in
-```
-
-På SW-CE1 trunks:
-
-```text
-interface GigabitEthernet0/0
- switchport trunk allowed vlan add 10
-!
-interface GigabitEthernet0/1
- switchport trunk allowed vlan add 10
-```
-
-På SW-CE1:
-
-```text
-interface Vlan10
- description MGMT-SW-CE1
- ip address 10.10.10.10 255.255.255.0
- no shutdown
-!
-ip default-gateway 10.10.10.1
-```
-
-### Problem med SW-CE2
-
-SW-CE2 bruger også `interface Vlan10`, men IP-nettet er `10.20.10.0/24`. Hvis SW-CE1 og SW-CE2 ligger i samme Layer 2 VLAN 10-domain, bør de ikke bruge forskellige subnets på samme VLAN.
-
-Bedre standard:
-
-| Enhed | VLAN | Net | Gateway |
-| --- | --- | --- | --- |
-| SW-CE1 | 10 | 10.10.10.0/24 | 10.10.10.1 |
-| SW-CE2 | 20 | 10.20.10.0/24 | 10.20.10.1 |
-
-Alternativt kan begge bruge samme management-subnet, fx VLAN 10 / `10.10.10.0/24`.
-
-## Anbefalet løsning B - Dedikeret out-of-band management
-
-Dette er den reneste løsning:
-
-```text
-Backupserver / mgmt LAN
-        |
-Management router / firewall
-        |
-Mgmt switch
-   |      |      |
- P1     P2    SW-CE
-```
-
-Fordele:
-
-- Management er adskilt fra lab-routing.
-- P-routere og switches kan nå backupserver uden at påvirke CE/BGP/MPLS designet.
-- Lettere at fejlfinde og mere realistisk.
-
-## P-routere
-
-P1 og P2 har ikke management interface/SVI i de aktuelle configs. Der er to realistiske muligheder:
-
-### Mulighed 1 - Brug Loopback0 som backup-source
-
-Hvis P1/P2 kan route til backupserveren via provider core, kan de bruge Loopback0 som source:
-
-```text
-ip tftp source-interface Loopback0
-ip ftp source-interface Loopback0
-```
-
-Derefter skal der være route til backupserveren, fx via ISP-R1/management-router.
-
-### Mulighed 2 - Tilføj management interface
-
-Hvis der findes et ledigt interface til management:
+Eksempel P1:
 
 ```text
 interface GigabitEthernet0/3
- description MGMT-to-backup-network
- ip address <mgmt-ip> <mask>
+ description OOB-MGMT-to-ISP-MGMT-SW
+ ip address 172.16.99.21 255.255.255.0
  no shutdown
 !
-ip route 0.0.0.0 0.0.0.0 <mgmt-gateway>
-```
-
-Denne løsning er mest tydelig i et lab, men den kræver et ekstra mgmt-net.
-
-## Backup med TFTP
-
-Cisco archive-template med TFTP:
-
-```text
+ip route 10.50.170.19 255.255.255.255 172.16.99.1
+ip tftp source-interface GigabitEthernet0/3
+!
 archive
  path tftp://10.50.170.19/$h-running-config.cfg
  write-memory
  time-period 1440
 ```
 
-Manuel kopi:
+Eksempel P2:
+
+```text
+interface GigabitEthernet0/3
+ description OOB-MGMT-to-ISP-MGMT-SW
+ ip address 172.16.99.22 255.255.255.0
+ no shutdown
+!
+ip route 10.50.170.19 255.255.255.255 172.16.99.1
+ip tftp source-interface GigabitEthernet0/3
+!
+archive
+ path tftp://10.50.170.19/$h-running-config.cfg
+ write-memory
+ time-period 1440
+```
+
+Eksempel ISP-R1/PE:
+
+```text
+interface GigabitEthernet0/3
+ description OOB-MGMT-to-ISP-MGMT-SW
+ ip address 172.16.99.10 255.255.255.0
+ no shutdown
+!
+ip route 10.50.170.19 255.255.255.255 172.16.99.1
+ip tftp source-interface GigabitEthernet0/3
+!
+archive
+ path tftp://10.50.170.19/$h-running-config.cfg
+ write-memory
+ time-period 1440
+```
+
+Brug helst en specifik host route til backupserveren i stedet for en fuld default route. Det minimerer risikoen for, at P/PE begynder at bruge managementnettet som generel internetudgang.
+
+## SW-CE config-model
+
+På L2-switches bruges management-SVI og `ip default-gateway`.
+
+Eksempel SW-CE1:
+
+```text
+vlan 999
+ name ISP-MGMT
+!
+interface GigabitEthernet3/3
+ description OOB-MGMT-to-ISP-MGMT-SW
+ switchport mode access
+ switchport access vlan 999
+ spanning-tree portfast edge
+!
+interface Vlan999
+ description ISP-MGMT-SW-CE1
+ ip address 172.16.99.31 255.255.255.0
+ no shutdown
+!
+interface Vlan10
+ shutdown
+!
+ip default-gateway 172.16.99.1
+!
+archive
+ path tftp://10.50.170.19/$h-running-config.cfg
+ write-memory
+ time-period 1440
+```
+
+Eksempel SW-CE2:
+
+```text
+vlan 999
+ name ISP-MGMT
+!
+interface GigabitEthernet3/3
+ description OOB-MGMT-to-ISP-MGMT-SW
+ switchport mode access
+ switchport access vlan 999
+ spanning-tree portfast edge
+!
+interface Vlan999
+ description ISP-MGMT-SW-CE2
+ ip address 172.16.99.32 255.255.255.0
+ no shutdown
+!
+interface Vlan10
+ shutdown
+!
+ip default-gateway 172.16.99.1
+!
+archive
+ path tftp://10.50.170.19/$h-running-config.cfg
+ write-memory
+ time-period 1440
+```
+
+## Backupmetode
+
+Start med TFTP, fordi det allerede er brugt på CE-routerne. Når reachability virker, kan backupmetoden senere skiftes til en mere sikker metode som SCP.
+
+Manuel test:
 
 ```bash
 copy running-config tftp:
 ```
 
-## Backup med FTP
+## ISP-MGMT gateway/router
 
-FTP kræver credentials. Undgå at gemme rigtige passwords i offentlige repos.
+ISP-MGMT gatewayen kan være:
 
-```text
-ip ftp username <username>
-ip ftp password <password>
-!
-archive
- path ftp://<username>:<password>@10.50.170.19/$h-running-config.cfg
- write-memory
- time-period 1440
-```
+- en lille router i labbet
+- en firewall
+- en Linux-router
+- en dedikeret management-VM
 
-Manuel kopi:
-
-```bash
-copy running-config ftp:
-```
-
-## NAT ACL hvis backupserver ligger uden for labbet
-
-Hvis management-nettene skal ud via CE-CORE-R1 NAT, skal de tilføjes til `NAT-SITES`:
+Minimum:
 
 ```text
-ip access-list standard NAT-SITES
- permit 10.10.10.0 0.0.0.255
- permit 10.20.10.0 0.0.0.255
+interface MGMT-LAN
+ ip address 172.16.99.1/24
+
+route til 10.50.170.19/32 eller direkte interface mod backupserver-net
 ```
 
-Hvis backupserveren er direkte routet i management-nettet, er NAT ikke nødvendig.
+Hvis backupserveren ligger i `10.50.170.0/24`, skal ISP-MGMT gatewayen kunne route dertil. CE-CORE-R1 skal ikke være transit for dette.
 
 ## Verifikation
 
@@ -203,36 +248,43 @@ På SW-CE:
 ```bash
 show ip interface brief
 show vlan brief
-show interfaces trunk
-ping 10.10.10.1
+show interfaces status
+ping 172.16.99.1
 ping 10.50.170.19
 copy running-config tftp:
 ```
 
-På P-routere:
+På P/PE-routere:
 
 ```bash
+show ip interface brief
 show ip route 10.50.170.19
-ping 10.50.170.19 source Loopback0
+ping 172.16.99.1 source GigabitEthernet0/3
+ping 10.50.170.19 source GigabitEthernet0/3
 copy running-config tftp:
 ```
 
-På CE-CORE-R1:
+På ISP-MGMT gateway:
 
 ```bash
-show ip route 10.10.10.0
-show ip route 10.20.10.0
-show access-lists NAT-SITES
-show ip nat translations
+show ip route
+ping 172.16.99.21
+ping 172.16.99.22
+ping 172.16.99.31
+ping 172.16.99.32
+ping 10.50.170.19
 ```
 
 ## Anbefalet næste ændring i labbet
 
-For denne lab anbefales:
+1. Lav eller vælg en ISP-MGMT gateway/router/firewall.
+2. Lav et dedikeret ISP-MGMT subnet, fx `172.16.99.0/24`.
+3. Tilslut P1, P2, ISP-R1/PE og SW-CE til managementnettet via ledige interfaces.
+4. Flyt SW-CE management fra Vlan10 til Vlan999 eller et andet dedikeret ISP-MGMT VLAN.
+5. Tilføj TFTP archive-template på P1, P2, ISP-R1, SW-CE1 og SW-CE2.
+6. Test `ping 10.50.170.19` fra management-source-interface.
+7. Test `copy running-config tftp:`.
 
-1. Brug TFTP først, fordi CE-routerne allerede bruger `tftp://10.50.170.19`.
-2. Lav management VLAN til SW-CE1/SW-CE2.
-3. Tilføj trunk allowed VLAN for management VLANs.
-4. Tilføj gateway på CE-CORE-R1 eller dedikeret management-router.
-5. Tilføj archive-template på P1, P2, SW-CE1 og SW-CE2.
-6. Skift først til FTP/SCP senere, når reachability virker.
+## Ikke anbefalet
+
+Det anbefales ikke at bruge CE-CORE-R1 som gateway/NAT for ISP-udstyr. Det gør designet uklart, fordi kundens internet breakout og providerens managementplan bliver blandet sammen.
