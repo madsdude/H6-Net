@@ -13,9 +13,12 @@ Dette dokument er en teknisk gennemgang af configs i `configs/Today-configs` med
 | configs/Today-configs/CE-KBH-R2 | CE-KBH-R2 | KBH CE2 |
 | configs/Today-configs/CE-ODE-R1 | CE-ODE-R1 | ODE CE1 |
 | configs/Today-configs/CE-ODE-R2 | CE-ODE-R2 | ODE CE2 |
-| configs/Today-configs/ISP-PE1 | ISP-R1 | PE-side/xconnect |
-| configs/Today-configs/P1 | P1 | Provider core |
+| configs/Today-configs/ISP-PE1 | ISP-R1 | PE1 / xconnect endpoint |
+| configs/Today-configs/ISP-PE2 | ISP-R2 | PE2 / xconnect endpoint |
+| configs/Today-configs/P1 | P1 | Provider core + ISP NAT breakout |
 | configs/Today-configs/P2 | P2 | Provider core |
+| configs/Today-configs/SW-CE1 | SW-CE1 | CE-facing L2 switch / management pending |
+| configs/Today-configs/SW-CE2 | SW-CE2 | CE-facing L2 switch / management pending |
 
 ## Kritiske fund
 
@@ -38,9 +41,9 @@ network 10.10.0.5 0.0.0.0 area 0
 
 Hvis OSPF stadig bruges under migration, bør dette tilføjes.
 
-### 2. AAH VLAN 101/102 mangler i fundet ISP-R1 xconnect config
+### 2. AAH VLAN 101/102 skal verificeres i xconnect-laget
 
-CE-CORE-R1 bruger VLAN 101 og 102 til AAH i den nye plan. ISP-R1 config viser xconnect for 100 og 110, men ikke 101 og 102.
+CE-CORE-R1 bruger VLAN 101 og 102 til AAH i den nye plan. ISP-R1 config viste tidligere xconnect for 100 og 110, men ikke 101 og 102.
 
 Tjek:
 
@@ -52,17 +55,52 @@ show run interface GigabitEthernet0/1.102
 
 Hvis de ikke findes, skal de oprettes på relevant PE-side.
 
-### 3. Remote PE config mangler
+### 3. PE2 / remote xconnect endpoint er nu dokumenteret
 
-ISP-R1 bruger xconnect peer:
+Remote PE er ikke længere et manglende designpunkt, fordi `ISP-PE2` findes i configs.
+
+| Enhed | Hostname | Loopback | Funktion |
+| --- | --- | --- | --- |
+| ISP-PE1 | ISP-R1 | 1.1.1.1/32 | PE1 / xconnect endpoint |
+| ISP-PE2 | ISP-R2 | 4.4.4.4/32 | PE2 / xconnect endpoint |
+
+Cleanup er nu primært navnestandard: filnavn og hostname bør gøres ens.
+
+### 4. P1 er nu ISP NAT breakout
+
+P1 er ændret til ISP-sidens NAT breakout med DHCP på Gi0/2, NAT outside på Gi0/2, NAT inside på provider links og default route annonceret i OSPF.
+
+Aktuel lab-model:
 
 ```text
-xconnect 4.4.4.4 <VC-ID> encapsulation mpls
+Gi0/0 -> PE1/provider core -> ip nat inside
+Gi0/1 -> PE2/provider core -> ip nat inside
+Gi0/2 -> DHCP/internet     -> ip nat outside
+OSPF 10 -> default-information originate
 ```
 
-Der er ikke fundet en config for remote PE `4.4.4.4` i `Today-configs`. Upload/dokumentér den, så xconnect-laget kan valideres fuldt.
+Dette er en god adskillelse fra CE-CORE-R1, fordi kundens site-internet og ISP-management ikke blandes.
 
-### 4. P1/P2 har OSPF network for 10.0.23.0/30 uden fundet interface
+Dog bruger P1 midlertidigt:
+
+```text
+access-list 1 permit any
+```
+
+Det virker til test, men bør strammes op til en dedikeret `NAT-ISP-MGMT` ACL.
+
+### 5. SW-CE mangler stadig management gateway/reachability
+
+SW-CE1 og SW-CE2 har management SVI'er, men de skal have gateway på PE-siden, ikke CE-CORE-R1.
+
+| Enhed | Management IP | Gateway der bør laves |
+| --- | --- | --- |
+| SW-CE1 | 10.10.10.10/24 | 10.10.10.1 på PE1 |
+| SW-CE2 | 10.20.10.10/24 | 10.20.10.1 på PE2 |
+
+Der skal også sikres, at VLAN 10 er tilladt på relevante trunks/access-links.
+
+### 6. P1/P2 har OSPF network for 10.0.23.0/30 uden fundet interface
 
 P1 og P2 har:
 
@@ -79,6 +117,7 @@ Men configs viser ikke et aktivt interface i `10.0.23.0/30`. Enten mangler der e
 | Fil | Problem | Anbefaling |
 | --- | --- | --- |
 | ISP-PE1 | Hostname er ISP-R1 | Omdøb fil til ISP-R1 eller hostname til ISP-PE1 |
+| ISP-PE2 | Hostname er ISP-R2 | Omdøb fil til ISP-R2 eller hostname til ISP-PE2 |
 
 ### BGP timers
 
@@ -100,7 +139,25 @@ P1 og P2 har:
 mpls ldp router-id Loopback0 force
 ```
 
-ISP-R1 bør også have det for standardisering.
+PE-routerne bør også have det for standardisering.
+
+### NAT ACL på P1
+
+Anbefaling efter SW-CE-test:
+
+```text
+ip access-list standard NAT-ISP-MGMT
+ permit 1.1.1.1
+ permit 2.2.2.2
+ permit 3.3.3.3
+ permit 4.4.4.4
+ permit 10.0.12.0 0.0.0.3
+ permit 10.0.13.0 0.0.0.3
+ permit 10.0.24.0 0.0.0.3
+ permit 10.0.34.0 0.0.0.3
+ permit 10.10.10.0 0.0.0.255
+ permit 10.20.10.0 0.0.0.255
+```
 
 ### Legacy subinterfaces
 
@@ -122,13 +179,14 @@ Anbefaling: behold dem kun så længe de er relevante for migrationshistorik. Fj
 | Punkt | Prioritet | Handling |
 | --- | --- | --- |
 | Tilføj/verificer OSPF for AAH CE2 `10.10.0.5` | Høj | Ret CE-CORE-R1 eller beslut at OSPF ikke skal bruges |
-| Verificer AAH VLAN 101/102 xconnect | Høj | Tjek ISP-R1/remote PE/SW-DIST trunks |
-| Upload remote PE config `4.4.4.4` | Høj | Nødvendig for fuld MPLS/xconnect dokumentation |
+| Verificer AAH VLAN 101/102 xconnect | Høj | Tjek ISP-R1/ISP-R2/SW-DIST trunks |
+| Færdiggør SW-CE management gateway | Høj | Lav PE1/PE2 subinterfaces og OSPF networks |
+| Stram P1 NAT ACL | Middel | Erstat `access-list 1 permit any` med `NAT-ISP-MGMT` |
 | Standardisér BGP timers | Middel | Brug samme timer-policy på alle peers |
-| Standardisér LDP router-id på ISP-R1 | Middel | Tilføj `mpls ldp router-id Loopback0 force` |
+| Standardisér LDP router-id på PE-routere | Middel | Tilføj `mpls ldp router-id Loopback0 force` |
 | Afklar `10.0.23.0/30` i OSPF | Middel | Fjern eller dokumentér P1-P2 link |
 | Fjern legacy VLAN/subinterfaces | Lav | Efter migration og test |
-| Omdøb ISP-PE1/ISP-R1 | Lav | Gør filnavn og hostname ens |
+| Omdøb ISP-PE1/ISP-R1 og ISP-PE2/ISP-R2 | Lav | Gør filnavn og hostname ens |
 
 ## Foreslåede rettelser
 
@@ -142,7 +200,7 @@ end
 write memory
 ```
 
-### ISP-R1 LDP standardisering
+### PE-router LDP standardisering
 
 ```text
 conf t
@@ -151,7 +209,7 @@ end
 write memory
 ```
 
-### Eksempel AAH xconnect hvis VLAN 101/102 mangler på ISP-R1
+### Eksempel AAH xconnect hvis VLAN 101/102 mangler på PE1
 
 ```text
 conf t
@@ -168,4 +226,36 @@ end
 write memory
 ```
 
-Dette skal kun laves, hvis switch-trunks og remote PE også er klar til VLAN/VC 101 og 102.
+Dette skal kun laves, hvis switch-trunks og PE2 også er klar til VLAN/VC 101 og 102.
+
+### Eksempel SW-CE management gateway på PE1
+
+```text
+conf t
+interface GigabitEthernet0/1.10
+ description ISP-MGMT-to-SW-CE1
+ encapsulation dot1Q 10
+ ip address 10.10.10.1 255.255.255.0
+ no shutdown
+!
+router ospf 10
+ network 10.10.10.0 0.0.0.255 area 0
+end
+write memory
+```
+
+### Eksempel SW-CE management gateway på PE2
+
+```text
+conf t
+interface GigabitEthernet0/1.10
+ description ISP-MGMT-to-SW-CE2
+ encapsulation dot1Q 10
+ ip address 10.20.10.1 255.255.255.0
+ no shutdown
+!
+router ospf 10
+ network 10.20.10.0 0.0.0.255 area 0
+end
+write memory
+```
