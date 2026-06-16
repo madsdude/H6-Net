@@ -1,0 +1,319 @@
+
+!
+! Last configuration change at 11:24:32 UTC Mon Jun 15 2026
+!
+version 15.9
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname CE-CORE-R1
+!
+boot-start-marker
+boot-end-marker
+!
+!
+!
+no aaa new-model
+!
+!
+!
+mmi polling-interval 60
+no mmi auto-configure
+no mmi pvc
+mmi snmp-timeout 180
+!
+!
+!
+!
+!
+no ip icmp rate-limit unreachable
+!
+!
+!
+!
+!
+!
+no ip domain lookup
+ip cef
+no ipv6 cef
+!
+multilink bundle-name authenticated
+!
+!
+!
+!
+archive
+ path tftp://10.50.170.19/$h-running-config.cfg
+ write-memory
+ time-period 1440
+!
+redundancy
+!
+no cdp log mismatch duplex
+!
+ip tcp synwait-time 5
+! 
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface Loopback0
+ ip address 11.11.11.11 255.255.255.255
+!
+interface GigabitEthernet0/0
+ description TRUNK-to-EPL
+ no ip address
+ duplex auto
+ speed auto
+ media-type rj45
+!
+interface GigabitEthernet0/0.100
+ description AAH-PRIMARY
+ encapsulation dot1Q 100
+ ip nat inside
+ ip virtual-reassembly in
+ shutdown
+!
+interface GigabitEthernet0/0.101
+ description AAH-CE1-PRIMARY
+ encapsulation dot1Q 101
+ ip address 10.10.0.1 255.255.255.252
+ ip nat inside
+ ip virtual-reassembly in
+!
+interface GigabitEthernet0/0.102
+ description AAH-CE2-SECONDARY
+ encapsulation dot1Q 102
+ ip address 10.10.0.5 255.255.255.252
+ ip nat inside
+ ip virtual-reassembly in
+!
+interface GigabitEthernet0/0.110
+ description AAH-SECONDARY
+ encapsulation dot1Q 110
+ ip nat inside
+ ip virtual-reassembly in
+ shutdown
+!
+interface GigabitEthernet0/0.200
+ description KBH-PRIMARY
+ encapsulation dot1Q 200
+ ip nat inside
+ ip virtual-reassembly in
+ shutdown
+!
+interface GigabitEthernet0/0.201
+ description KBH-CE1-PRIMARY
+ encapsulation dot1Q 201
+ ip address 10.20.0.1 255.255.255.252
+ ip nat inside
+ ip virtual-reassembly in
+!
+interface GigabitEthernet0/0.202
+ description KBH-CE2-SECONDARY
+ encapsulation dot1Q 202
+ ip address 10.20.0.5 255.255.255.252
+ ip nat inside
+ ip virtual-reassembly in
+!
+interface GigabitEthernet0/0.210
+ description KBH-SECONDARY
+ encapsulation dot1Q 210
+ ip nat inside
+ ip virtual-reassembly in
+ shutdown
+!
+interface GigabitEthernet0/0.300
+ description ODE-PRIMARY
+ encapsulation dot1Q 300
+ ip nat inside
+ ip virtual-reassembly in
+ shutdown
+!
+interface GigabitEthernet0/0.301
+ description ODE-CE1-PRIMARY
+ encapsulation dot1Q 301
+ ip address 10.30.0.1 255.255.255.252
+ ip nat inside
+ ip virtual-reassembly in
+!
+interface GigabitEthernet0/0.302
+ description ODE-CE2-SECONDARY
+ encapsulation dot1Q 302
+ ip address 10.30.0.5 255.255.255.252
+ ip nat inside
+ ip virtual-reassembly in
+!
+interface GigabitEthernet0/0.310
+ description ODE-SECONDARY
+ encapsulation dot1Q 310
+ ip nat inside
+ ip virtual-reassembly in
+ shutdown
+!
+interface GigabitEthernet0/1
+ ip address dhcp
+ ip nat outside
+ ip virtual-reassembly in
+ duplex auto
+ speed auto
+ media-type rj45
+!
+interface GigabitEthernet0/2
+ no ip address
+ shutdown
+ duplex auto
+ speed auto
+ media-type rj45
+!
+interface GigabitEthernet0/3
+ no ip address
+ shutdown
+ duplex auto
+ speed auto
+ media-type rj45
+!
+router ospf 100
+ router-id 11.11.11.11
+ network 10.10.0.1 0.0.0.0 area 0
+ network 10.20.0.1 0.0.0.0 area 0
+ network 10.20.0.5 0.0.0.0 area 0
+ network 10.30.0.1 0.0.0.0 area 0
+ network 10.30.0.5 0.0.0.0 area 0
+ network 11.11.11.11 0.0.0.0 area 0
+ default-information originate always
+!
+router bgp 65000
+ bgp router-id 11.11.11.11
+ bgp log-neighbor-changes
+ neighbor 10.10.0.2 remote-as 65010
+ neighbor 10.10.0.2 description AAH-CE1-PRIMARY
+ neighbor 10.10.0.2 default-originate route-map DEFAULT-PRIMARY
+ neighbor 10.10.0.2 route-map SITE-PRIMARY-IN in
+ neighbor 10.10.0.6 remote-as 65010
+ neighbor 10.10.0.6 description AAH-CE2-SECONDARY
+ neighbor 10.10.0.6 default-originate route-map DEFAULT-SECONDARY
+ neighbor 10.10.0.6 route-map SITE-SECONDARY-IN in
+ neighbor 10.20.0.2 remote-as 65020
+ neighbor 10.20.0.2 description KBH-CE1-PRIMARY
+ neighbor 10.20.0.2 timers 5 15
+ neighbor 10.20.0.2 default-originate route-map DEFAULT-PRIMARY
+ neighbor 10.20.0.2 route-map SITE-PRIMARY-IN in
+ neighbor 10.20.0.6 remote-as 65020
+ neighbor 10.20.0.6 description KBH-CE2-SECONDARY
+ neighbor 10.20.0.6 default-originate route-map DEFAULT-SECONDARY
+ neighbor 10.20.0.6 route-map SITE-SECONDARY-IN in
+ neighbor 10.30.0.2 remote-as 65030
+ neighbor 10.30.0.2 description ODE-CE1-PRIMARY
+ neighbor 10.30.0.2 timers 5 15
+ neighbor 10.30.0.2 default-originate route-map DEFAULT-PRIMARY
+ neighbor 10.30.0.2 route-map SITE-PRIMARY-IN in
+ neighbor 10.30.0.6 remote-as 65030
+ neighbor 10.30.0.6 description ODE-CE2-SECONDARY
+ neighbor 10.30.0.6 default-originate route-map DEFAULT-SECONDARY
+ neighbor 10.30.0.6 route-map SITE-SECONDARY-IN in
+!
+ip forward-protocol nd
+!
+!
+no ip http server
+no ip http secure-server
+ip nat inside source list NAT-SITES interface GigabitEthernet0/1 overload
+ip route 0.0.0.0 0.0.0.0 10.50.170.1
+!
+ip access-list standard NAT-SITES
+ remark === AAH LOOPBACKS ===
+ permit 22.22.22.22
+ remark === KBH LOOPBACKS ===
+ permit 33.33.33.33
+ remark === ODE LOOPBACKS ===
+ permit 44.44.44.44
+ permit 22.22.22.23
+ permit 44.44.44.45
+ permit 33.33.33.34
+ remark === AAH WAN / INTERCONNECT - NEW PLAN ===
+ permit 10.10.0.0 0.0.0.3
+ permit 10.10.0.4 0.0.0.3
+ permit 10.10.0.8 0.0.0.3
+ remark === KBH WAN / INTERCONNECT - NEW PLAN ===
+ permit 10.20.0.0 0.0.0.3
+ permit 10.20.0.4 0.0.0.3
+ permit 10.20.0.8 0.0.0.3
+ remark === ODE WAN / INTERCONNECT - NEW PLAN ===
+ permit 10.30.0.0 0.0.0.3
+ permit 10.30.0.4 0.0.0.3
+ permit 10.30.0.8 0.0.0.3
+ remark === TEMP OLD SECONDARY LINKS DURING MIGRATION ===
+ permit 10.21.0.0 0.0.0.3
+ permit 10.31.0.0 0.0.0.3
+!
+ipv6 ioam timestamp
+!
+route-map DEFAULT-PRIMARY permit 10
+ set metric 0
+!
+route-map DEFAULT-SECONDARY permit 10
+ set metric 200
+!
+route-map SITE-PRIMARY-IN permit 10
+ set local-preference 200
+!
+route-map SITE-SECONDARY-IN permit 10
+ set local-preference 100
+!
+!
+!
+control-plane
+!
+banner exec 
+**************************************************************************
+* IOSv is strictly limited to use for evaluation, demonstration and IOS  *
+* education. IOSv is provided as-is and is not supported by Cisco's      *
+* Technical Advisory Center. Any use or disclosure, in whole or in part, *
+* of the IOSv Software or Documentation to any third party for any       *
+* purposes is expressly prohibited except as otherwise authorized by     *
+* Cisco in writing.                                                      *
+**************************************************************************
+banner incoming 
+**************************************************************************
+* IOSv is strictly limited to use for evaluation, demonstration and IOS  *
+* education. IOSv is provided as-is and is not supported by Cisco's      *
+* Technical Advisory Center. Any use or disclosure, in whole or in part, *
+* of the IOSv Software or Documentation to any third party for any       *
+* purposes is expressly prohibited except as otherwise authorized by     *
+* Cisco in writing.                                                      *
+**************************************************************************
+banner login 
+**************************************************************************
+* IOSv is strictly limited to use for evaluation, demonstration and IOS  *
+* education. IOSv is provided as-is and is not supported by Cisco's      *
+* Technical Advisory Center. Any use or disclosure, in whole or in part, *
+* of the IOSv Software or Documentation to any third party for any       *
+* purposes is expressly prohibited except as otherwise authorized by     *
+* Cisco in writing.                                                      *
+**************************************************************************
+!
+line con 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+line aux 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+line vty 0 4
+ login
+ transport input none
+!
+no scheduler allocate
+!
+end
