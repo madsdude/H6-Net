@@ -1,32 +1,64 @@
-# 01 - Overview
+# 01 - Overblik over H6-Net
 
-H6-Net dokumenterer et netværkslab med et provider transportlag og et customer routinglag.
+H6-Net dokumenterer et ISP-/enterprise-lignende WAN-design med MPLS-transport, EPL/xconnect, CE-routing, BGP og central internet breakout.
 
-## Kort beskrivelse
+Dokumentationen er baseret på configs i:
 
-Labbet bygger et design, hvor P- og PE-routere leverer MPLS-baseret transport, mens CE-routere bruger EPL-forbindelserne til Layer 3 routing med BGP. CORE-routeren fungerer som central internet breakout med NAT.
+```text
+configs/Today-configs/
+```
 
-## Designmål
+## Formål
 
-- Bygge et tydeligt skel mellem provider transport og customer routing
-- Dokumentere P-, PE- og CE-roller
-- Dokumentere EPL/xconnect over MPLS
-- Bruge BGP mellem CORE og sites
-- Have primær og sekundær path pr. site
-- Kunne teste failover kontrolleret
-- Standardisere configs og navngivning
-- Gøre labbet nemt at udvide med nye sites
+Labbet viser, hvordan et provider-netværk kan levere transparente Layer 2 EPL-forbindelser mellem kundens CE-routere, mens kundens routing bygges ovenpå med BGP og midlertidig OSPF under migration.
 
-## Lag i designet
+CORE-sitet fungerer som central internet breakout. De øvrige sites modtager default route fra CORE via eBGP og sender internettrafik tilbage til CORE, hvor NAT udføres.
 
-| Lag | Protokoller / funktioner | Formål |
+## Designlag
+
+| Lag | Funktion | Teknologi |
 | --- | --- | --- |
-| Provider core | OSPF, MPLS, LDP | Transport mellem PE-routere |
-| Provider edge | Xconnect, subinterfaces, VLANs | Terminerer EPL-services |
-| EPL transport | Layer 2 pseudowire | Transparent forbindelse mellem CE-sider |
-| CE routing | eBGP, midlertidig OSPF | Routing mellem CORE og sites |
-| Internet breakout | NAT, default route | Central internetadgang via CORE |
+| ISP Core | Transport mellem PE-routere | OSPF 10, MPLS, LDP, BFD |
+| P-routere | Ren provider core forwarding | OSPF, MPLS/LDP |
+| PE-routere | EPL/xconnect termination | Dot1Q subinterfaces, MPLS xconnect |
+| EPL Layer 2 | Transparent WAN-transport | VLAN til VC-ID mapping |
+| CE Routing | Kundens Layer 3 routing | eBGP, iBGP og midlertidig OSPF 100 |
+| Internet breakout | Central udgang mod internet | NAT overload på CE-CORE-R1 |
 
-## Slutmål
+## Aktive hovedkomponenter
 
-Slutdesignet skal ende med, at CE-laget primært bruger BGP, mens OSPF kun bruges i provider core. OSPF på CE-WAN kan bruges midlertidigt under migration, men bør fjernes, når BGP-designet er stabilt.
+| Enhed | Rolle | Primær funktion |
+| --- | --- | --- |
+| CE-CORE-R1 | Central CE / internet breakout | BGP AS 65000, NAT, default route til sites |
+| CE-AAH-R1 / CE-AAH-R2 | AAH site CE-par | AS 65010, primær/sekundær CE-design |
+| CE-KBH-R1 / CE-KBH-R2 | KBH site CE-par | AS 65020, primær/sekundær CE-design |
+| CE-ODE-R1 / CE-ODE-R2 | ODE site CE-par | AS 65030, primær/sekundær CE-design |
+| ISP-R1 | PE-side mod CORE/SW-DIST | MPLS xconnect mod remote PE |
+| P1 / P2 | ISP core routers | MPLS/LDP transit med OSPF 10 |
+
+## Routingprincip
+
+```text
+Site CE1/CE2
+  -> EPL/xconnect via ISP MPLS core
+  -> CE-CORE-R1
+  -> NAT overload
+  -> Internet / upstream gateway
+```
+
+CE-CORE-R1 annoncerer default route til site-CE'erne via BGP. Site-routerne annoncerer deres loopbacks tilbage til CORE. CE1 og CE2 på samme site bruger iBGP imellem sig, så begge lokale CE-routere kender hinandens site-ruter.
+
+## Nuværende status
+
+- Ny to-CE plan er aktiv for AAH, KBH og ODE.
+- CORE bruger subinterfaces pr. site og CE-router.
+- BGP er aktivt mellem CORE og sites.
+- OSPF 100 findes stadig på CE-laget som migrationshjælp.
+- NAT ACL er opdateret med CE1/CE2 loopbacks og nye WAN-/interconnect-net.
+- Providerlaget bruger OSPF 10, MPLS/LDP og BFD.
+
+## Vigtige noter
+
+- `configs/Today-configs/ISP-PE1` har hostname `ISP-R1`. Dokumentationen bruger hostname `ISP-R1`, men nævner filnavnet hvor det er relevant.
+- Remote PE med xconnect peer `4.4.4.4` er ikke fundet som config i `Today-configs`. Den er derfor dokumenteret som en manglende/må verificeres enhed.
+- P1 og P2 har OSPF network statement for `10.0.23.0/30`, men der er ikke fundet et tilsvarende aktivt interface i de uploadede configs.
