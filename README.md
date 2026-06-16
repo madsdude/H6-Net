@@ -15,6 +15,7 @@ Labbet indeholder:
 - EPL/xconnect services
 - CE-routere på sites
 - eBGP mellem CORE og sites
+- iBGP mellem CE-routere på samme site
 - Primær og sekundær WAN-forbindelse
 - Central NAT og internet breakout
 - Failover-test
@@ -68,9 +69,18 @@ NAT / Internet breakout
 | docs/11-failover-design.md | Failover design |
 | docs/12-migration-plan.md | Migration fra OSPF til BGP |
 | docs/13-troubleshooting.md | Fejlfinding og show-kommandoer |
+| docs/14-config-review-and-cleanup.md | Review af Today-configs og oprydningspunkter |
+
+## Config-kilde
+
+Dokumentationen er opdateret efter configs i:
+
+```text
+configs/Today-configs/
+```
 
 ## Status
 
-Dette repo er under opbygning.
+Dokumentationen er nu opbygget som separate Markdown-filer under `docs/`. Næste naturlige skridt er at uploade/verificere remote PE-configen for xconnect peer `4.4.4.4`, så MPLS/EPL-laget kan dokumenteres helt færdigt.
 
 > Note: Repoet bør holdes privat, hvis der senere uploades rigtige running-configs, passwords, SNMP communities, TACACS/RADIUS keys eller anden følsom information.
