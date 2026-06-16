@@ -18,6 +18,7 @@ Labbet indeholder:
 - iBGP mellem CE-routere på samme site
 - Primær og sekundær WAN-forbindelse
 - Central NAT og internet breakout
+- Management-/backup-adgang til configs
 - Failover-test
 - Standardiserede configs
 - Dokumenteret IP-plan, VLAN-plan og AS-plan
@@ -31,6 +32,7 @@ Labbet indeholder:
 | EPL Layer 2 | Leverer transparente Layer 2-forbindelser mellem CE-sites |
 | CE Routing | BGP, default route, site-routing og midlertidig OSPF under migration |
 | CORE Breakout | NAT og central internet breakout |
+| Management | Backup af configs til FTP/TFTP-server |
 
 ## Hovedprincip
 
@@ -70,6 +72,7 @@ NAT / Internet breakout
 | docs/12-migration-plan.md | Migration fra OSPF til BGP |
 | docs/13-troubleshooting.md | Fejlfinding og show-kommandoer |
 | docs/14-config-review-and-cleanup.md | Review af Today-configs og oprydningspunkter |
+| docs/15-management-backup-ftp.md | Management og FTP/TFTP backup af configs |
 
 ## Config-kilde
 
