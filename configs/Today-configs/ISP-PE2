@@ -1,0 +1,218 @@
+
+Current configuration : 4987 bytes
+!
+! Last configuration change at 10:39:38 UTC Mon Jun 15 2026
+!
+version 15.9
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname ISP-R2
+!
+boot-start-marker
+boot-end-marker
+!
+!
+!
+no aaa new-model
+!
+!
+!
+mmi polling-interval 60
+no mmi auto-configure
+no mmi pvc
+mmi snmp-timeout 180
+!
+!
+!
+!
+!
+no ip icmp rate-limit unreachable
+!
+!
+!
+!
+!
+!
+no ip domain lookup
+ip cef
+no ipv6 cef
+!
+multilink bundle-name authenticated
+mpls label protocol ldp
+!
+!
+!
+!
+!
+redundancy
+!
+no cdp log mismatch duplex
+!
+ip tcp synwait-time 5
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface Loopback0
+ ip address 4.4.4.4 255.255.255.255
+!
+interface GigabitEthernet0/0
+ description CORE-TO-P1
+ ip address 10.0.24.2 255.255.255.252
+ ip ospf cost 10
+ duplex auto
+ speed auto
+ media-type rj45
+ mpls ip
+ bfd interval 50 min_rx 50 multiplier 3
+!
+interface GigabitEthernet0/1
+ description TRUNK-FROM-SW-DIST-2
+ no ip address
+ duplex auto
+ speed auto
+ media-type rj45
+ no keepalive
+!
+interface GigabitEthernet0/1.100
+ description EPL-CUSTOMER-A-VC100
+ encapsulation dot1Q 100
+ xconnect 1.1.1.1 100 encapsulation mpls
+!
+interface GigabitEthernet0/1.110
+ description AAH-SECONDARY-VC110
+ encapsulation dot1Q 110
+ xconnect 1.1.1.1 110 encapsulation mpls
+!
+interface GigabitEthernet0/1.200
+ description EPL-CUSTOMER-B-VC200
+ encapsulation dot1Q 200
+ xconnect 1.1.1.1 200 encapsulation mpls
+!
+interface GigabitEthernet0/1.201
+ description KBH-CE1-PRIMARY-VC201
+ encapsulation dot1Q 201
+ xconnect 1.1.1.1 201 encapsulation mpls
+!
+interface GigabitEthernet0/1.202
+ description KBH-CE2-SECONDARY-VC202
+ encapsulation dot1Q 202
+ xconnect 1.1.1.1 202 encapsulation mpls
+!
+interface GigabitEthernet0/1.210
+ description KBH-SECONDARY-VC210
+ encapsulation dot1Q 210
+ xconnect 1.1.1.1 210 encapsulation mpls
+!
+interface GigabitEthernet0/1.300
+ description EPL-CUSTOMER-B-VC300
+ encapsulation dot1Q 300
+ xconnect 1.1.1.1 300 encapsulation mpls
+!
+interface GigabitEthernet0/1.301
+ description ODE-CE1-PRIMARY-VC301
+ encapsulation dot1Q 301
+ xconnect 1.1.1.1 301 encapsulation mpls
+!
+interface GigabitEthernet0/1.302
+ description ODE-CE2-SECONDARY-VC302
+ encapsulation dot1Q 302
+ xconnect 1.1.1.1 302 encapsulation mpls
+!
+interface GigabitEthernet0/1.310
+ description ODE-SECONDARY-VC310
+ encapsulation dot1Q 310
+ xconnect 1.1.1.1 310 encapsulation mpls
+!
+interface GigabitEthernet0/2
+ description CORE-TO-P2
+ ip address 10.0.34.2 255.255.255.252
+ ip ospf cost 20
+ duplex auto
+ speed auto
+ media-type rj45
+ mpls ip
+ bfd interval 50 min_rx 50 multiplier 3
+!
+interface GigabitEthernet0/3
+ no ip address
+ shutdown
+ duplex auto
+ speed auto
+ media-type rj45
+!
+router ospf 10
+ router-id 4.4.4.4
+ network 4.4.4.4 0.0.0.0 area 0
+ network 10.0.24.0 0.0.0.3 area 0
+ network 10.0.34.0 0.0.0.3 area 0
+ bfd all-interfaces
+!
+ip forward-protocol nd
+!
+!
+no ip http server
+no ip http secure-server
+!
+ipv6 ioam timestamp
+!
+!
+!
+control-plane
+!
+banner exec ^C
+**************************************************************************
+* IOSv is strictly limited to use for evaluation, demonstration and IOS  *
+* education. IOSv is provided as-is and is not supported by Cisco's      *
+* Technical Advisory Center. Any use or disclosure, in whole or in part, *
+* of the IOSv Software or Documentation to any third party for any       *
+* purposes is expressly prohibited except as otherwise authorized by     *
+* Cisco in writing.                                                      *
+**************************************************************************^C
+banner incoming ^C
+**************************************************************************
+* IOSv is strictly limited to use for evaluation, demonstration and IOS  *
+* education. IOSv is provided as-is and is not supported by Cisco's      *
+* Technical Advisory Center. Any use or disclosure, in whole or in part, *
+* of the IOSv Software or Documentation to any third party for any       *
+* purposes is expressly prohibited except as otherwise authorized by     *
+* Cisco in writing.                                                      *
+**************************************************************************^C
+banner login ^C
+**************************************************************************
+* IOSv is strictly limited to use for evaluation, demonstration and IOS  *
+* education. IOSv is provided as-is and is not supported by Cisco's      *
+* Technical Advisory Center. Any use or disclosure, in whole or in part, *
+* of the IOSv Software or Documentation to any third party for any       *
+* purposes is expressly prohibited except as otherwise authorized by     *
+* Cisco in writing.                                                      *
+**************************************************************************^C
+!
+line con 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+line aux 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+line vty 0 4
+ login
+ transport input none
+!
+no scheduler allocate
+!
+end
+
+ISP-R2#
